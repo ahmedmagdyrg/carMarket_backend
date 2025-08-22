@@ -5,8 +5,8 @@ const carSchema = new mongoose.Schema(
     make: { type: String, required: true },     
     model: { type: String, required: true },     
     year: { type: Number, required: true },
-    price: { type: Number, required: true },
-    mileage: { type: Number, required: true },
+    price: { type: Number, required: true },      
+    mileage: { type: Number, required: true },   
     condition: { 
       type: String, 
       enum: ["New", "Used", "Certified"], 
@@ -14,7 +14,7 @@ const carSchema = new mongoose.Schema(
     },
     features: { type: [String], default: [] },
     description: { type: String },
-    imageUrl: { type: String, required: true }   
+    imageUrl: { type: String, required: true }  
   },
   { timestamps: true }
 );

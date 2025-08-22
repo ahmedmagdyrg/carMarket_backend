@@ -10,27 +10,49 @@ const getAllCars = async (req, res) => {
   }
 };
 
+// Get single car by ID
+const getCarById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const car = await Car.findById(id);
+
+    if (!car) {
+      return res.status(404).json({ message: "Car not found" });
+    }
+
+    res.json(car);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // Add new car
 const addCar = async (req, res) => {
   try {
-    const { name, brand, year, price, mileage, condition, features, description } = req.body;
+    const { make, model, year, price, mileage, condition, features, description } = req.body;
 
-    if (!name || !brand || !year || !condition) {
-      return res.status(400).json({ message: "name, brand, year, and condition are required" });
+    // Required fields check
+    if (!make || !model || !year || !condition || !price || !mileage) {
+      return res.status(400).json({ message: "make, model, year, condition, price, and mileage are required" });
     }
 
+    // Image check
     const imagePath = req.file ? req.file.path : null;
+    if (!imagePath) {
+      return res.status(400).json({ message: "Image is required" });
+    }
 
+    // Create new car
     const newCar = await Car.create({
-      name,
-      brand,
+      make,
+      model,
       year: Number(year),
-      price: price || null,
-      mileage: mileage || null,
+      price: Number(price),
+      mileage: Number(mileage),
       condition,
       features: features || [],
       description: description || null,
-      image: imagePath
+      imageUrl: imagePath
     });
 
     res.status(201).json(newCar);
@@ -39,25 +61,27 @@ const addCar = async (req, res) => {
   }
 };
 
-// Update car
+// Update car by ID
 const updateCar = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, brand, year, price, mileage, condition, features, description } = req.body;
+    const { make, model, year, price, mileage, condition, features, description } = req.body;
 
+    // Build updated fields object
     const updatedFields = {
-      ...(name && { name }),
-      ...(brand && { brand }),
+      ...(make && { make }),
+      ...(model && { model }),
       ...(year && { year: Number(year) }),
-      ...(price && { price }),
-      ...(mileage && { mileage }),
+      ...(price && { price: Number(price) }),
+      ...(mileage && { mileage: Number(mileage) }),
       ...(condition && { condition }),
       ...(features && { features }),
       ...(description && { description }),
     };
 
+    // Update image if provided
     if (req.file) {
-      updatedFields.image = req.file.path;
+      updatedFields.imageUrl = req.file.path;
     }
 
     const updatedCar = await Car.findByIdAndUpdate(id, updatedFields, { new: true });
@@ -70,7 +94,7 @@ const updateCar = async (req, res) => {
   }
 };
 
-// Delete car
+// Delete car by ID
 const deleteCar = async (req, res) => {
   try {
     const { id } = req.params;
@@ -84,4 +108,4 @@ const deleteCar = async (req, res) => {
   }
 };
 
-module.exports = { getAllCars, addCar, updateCar, deleteCar };
+module.exports = { getAllCars, getCarById, addCar, updateCar, deleteCar };

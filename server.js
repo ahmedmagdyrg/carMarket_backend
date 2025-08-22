@@ -13,8 +13,14 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
-// Static folder for uploaded files
+// Static folder for uploaded files (accessible via full URL)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Helper middleware to attach base URL (used for building image URLs)
+app.use((req, res, next) => {
+  req.baseUrlPath = `${req.protocol}://${req.get('host')}`;
+  next();
+});
 
 // Routes
 const carRoutes = require('./routes/carRoutes');
@@ -25,7 +31,6 @@ app.use('/api/auth', authRoutes);
 
 // DB connection
 mongoose.connect(process.env.MONGO_URI, {
-  // modern mongoose no longer needs these flags, but they are harmless:
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
