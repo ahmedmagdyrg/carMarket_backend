@@ -1,6 +1,5 @@
-const Car = require("../models/Car");
+const Car = require("../models/car");
 
-// Get all cars
 const getAllCars = async (req, res) => {
   try {
     const cars = await Car.find().sort({ createdAt: -1 });
@@ -10,7 +9,6 @@ const getAllCars = async (req, res) => {
   }
 };
 
-// Get single car by ID
 const getCarById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -26,23 +24,19 @@ const getCarById = async (req, res) => {
   }
 };
 
-// Add new car
 const addCar = async (req, res) => {
   try {
-    const { make, model, year, price, mileage, condition, features, description } = req.body;
+    const { make, model, year, price, mileage, condition, features, description, contactMethod } = req.body;
 
-    // Required fields check
-    if (!make || !model || !year || !condition || !price || !mileage) {
-      return res.status(400).json({ message: "make, model, year, condition, price, and mileage are required" });
+    if (!make || !model || !year || !condition || !price || !mileage || !contactMethod) {
+      return res.status(400).json({ message: "make, model, year, condition, price, mileage, and contactMethod are required" });
     }
 
-    // Image check
-    const imagePath = req.file ? req.file.path : null;
-    if (!imagePath) {
-      return res.status(400).json({ message: "Image is required" });
+    const imagePaths = req.files ? req.files.map(file => file.path) : [];
+    if (imagePaths.length === 0) {
+      return res.status(400).json({ message: "At least one image is required" });
     }
 
-    // Create new car
     const newCar = await Car.create({
       make,
       model,
@@ -52,7 +46,9 @@ const addCar = async (req, res) => {
       condition,
       features: features || [],
       description: description || null,
-      imageUrl: imagePath
+      images: imagePaths,
+      userId: req.user.id,
+      contactMethod
     });
 
     res.status(201).json(newCar);
@@ -61,13 +57,19 @@ const addCar = async (req, res) => {
   }
 };
 
-// Update car by ID
 const updateCar = async (req, res) => {
   try {
     const { id } = req.params;
-    const { make, model, year, price, mileage, condition, features, description } = req.body;
+    const car = await Car.findById(id);
 
-    // Build updated fields object
+    if (!car) return res.status(404).json({ message: "Car not found" });
+
+    if (car.userId.toString() !== req.user.id) {
+      return res.status(403).json({ message: "You are not allowed to update this car" });
+    }
+
+    const { make, model, year, price, mileage, condition, features, description, contactMethod } = req.body;
+
     const updatedFields = {
       ...(make && { make }),
       ...(model && { model }),
@@ -77,16 +79,14 @@ const updateCar = async (req, res) => {
       ...(condition && { condition }),
       ...(features && { features }),
       ...(description && { description }),
+      ...(contactMethod && { contactMethod })
     };
 
-    // Update image if provided
-    if (req.file) {
-      updatedFields.imageUrl = req.file.path;
+    if (req.files && req.files.length > 0) {
+      updatedFields.images = req.files.map(file => file.path);
     }
 
     const updatedCar = await Car.findByIdAndUpdate(id, updatedFields, { new: true });
-
-    if (!updatedCar) return res.status(404).json({ message: "Car not found" });
 
     res.json(updatedCar);
   } catch (err) {
@@ -94,13 +94,18 @@ const updateCar = async (req, res) => {
   }
 };
 
-// Delete car by ID
 const deleteCar = async (req, res) => {
   try {
     const { id } = req.params;
-    const deletedCar = await Car.findByIdAndDelete(id);
+    const car = await Car.findById(id);
 
-    if (!deletedCar) return res.status(404).json({ message: "Car not found" });
+    if (!car) return res.status(404).json({ message: "Car not found" });
+
+    if (car.userId.toString() !== req.user.id) {
+      return res.status(403).json({ message: "You are not allowed to delete this car" });
+    }
+
+    await car.deleteOne();
 
     res.json({ message: "Car deleted successfully" });
   } catch (err) {

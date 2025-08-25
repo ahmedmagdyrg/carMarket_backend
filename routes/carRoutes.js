@@ -11,14 +11,12 @@ const {
 } = require('../controllers/carController');
 const authMiddleware = require('../middleware/authMiddleware');
 
-// Multer configuration for handling file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads/'),
   filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
 });
 const upload = multer({ storage });
 
-// Validation rules for creating a car
 const createCarValidators = [
   body('make').notEmpty().withMessage('make is required'),
   body('model').notEmpty().withMessage('model is required'),
@@ -44,10 +42,12 @@ const createCarValidators = [
     .withMessage('condition must be New, Used, or Certified'),
   body('features').optional().isArray().withMessage('features must be an array'),
   body('description').optional().isString(),
-  body('imageUrl').optional().isString()
+  body('contactMethod')
+    .notEmpty()
+    .withMessage('contactMethod is required')
+    .isString()
 ];
 
-// Validation rules for updating a car (all fields optional)
 const updateCarValidators = [
   body('make').optional().isString(),
   body('model').optional().isString(),
@@ -57,38 +57,36 @@ const updateCarValidators = [
   body('condition').optional().isIn(['New', 'Used', 'Certified']).withMessage('condition must be New, Used, or Certified'),
   body('features').optional().isArray().withMessage('features must be an array'),
   body('description').optional().isString(),
-  body('imageUrl').optional().isString()
+  body('contactMethod').optional().isString()
 ];
 
-// Middleware for handling validation errors
 function validateRequest(req, res, next) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
   next();
 }
 
-// Routes
-router.get('/', getAllCars); // Get all cars
-router.get('/:id', getCarById); // Get single car by ID
+router.get('/', getAllCars);
+router.get('/:id', getCarById);
 
 router.post(
   '/',
-  authMiddleware,            // Require authentication
-  upload.single('image'),     // Handle image upload
-  createCarValidators,        // Validate request body
-  validateRequest,            // Handle validation errors
-  addCar                      // Controller function
+  authMiddleware,
+  upload.array('images', 10),
+  createCarValidators,
+  validateRequest,
+  addCar
 );
 
 router.put(
   '/:id',
-  authMiddleware,            // Require authentication
-  upload.single('image'),     // Handle image upload
-  updateCarValidators,        // Validate request body
-  validateRequest,            // Handle validation errors
-  updateCar                   // Controller function
+  authMiddleware,
+  upload.array('images', 10),
+  updateCarValidators,
+  validateRequest,
+  updateCar
 );
 
-router.delete('/:id', authMiddleware, deleteCar); // Delete car (protected)
+router.delete('/:id', authMiddleware, deleteCar);
 
 module.exports = router;
