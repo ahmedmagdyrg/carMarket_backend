@@ -7,47 +7,33 @@ const {
   getCarById, 
   addCar, 
   updateCar, 
-  deleteCar 
+  deleteCar,
+  getCarsByUser,
+  getUserCars
 } = require('../controllers/carController');
-const authMiddleware = require('../middleware/authMiddleware');
+const { authMiddleware } = require('../middleware/authMiddleware');
 
+// File upload setup
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads/'),
   filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
 });
 const upload = multer({ storage });
 
+// Validators for create
 const createCarValidators = [
   body('make').notEmpty().withMessage('make is required'),
   body('model').notEmpty().withMessage('model is required'),
-  body('year')
-    .notEmpty()
-    .withMessage('year is required')
-    .isInt({ min: 1886 })
-    .withMessage('year must be valid'),
-  body('price')
-    .notEmpty()
-    .withMessage('price is required')
-    .isFloat({ gt: 0 })
-    .withMessage('price must be a positive number'),
-  body('mileage')
-    .notEmpty()
-    .withMessage('mileage is required')
-    .isInt({ min: 0 })
-    .withMessage('mileage must be a positive integer'),
-  body('condition')
-    .notEmpty()
-    .withMessage('condition is required')
-    .isIn(['New', 'Used', 'Certified'])
-    .withMessage('condition must be New, Used, or Certified'),
-  body('features').optional().isArray().withMessage('features must be an array'),
+  body('year').notEmpty().isInt({ min: 1886 }).withMessage('year must be valid'),
+  body('price').notEmpty().isFloat({ gt: 0 }).withMessage('price must be a positive number'),
+  body('mileage').notEmpty().isInt({ min: 0 }).withMessage('mileage must be a positive integer'),
+  body('condition').notEmpty().isIn(['New', 'Used', 'Certified']).withMessage('condition must be New, Used, or Certified'),
+  body('features').optional().custom(val => Array.isArray(val) || typeof val === 'string'),
   body('description').optional().isString(),
-  body('contactMethod')
-    .notEmpty()
-    .withMessage('contactMethod is required')
-    .isString()
+  body('contactMethod').notEmpty().isString().withMessage('contactMethod is required')
 ];
 
+// Validators for update
 const updateCarValidators = [
   body('make').optional().isString(),
   body('model').optional().isString(),
@@ -55,20 +41,27 @@ const updateCarValidators = [
   body('price').optional().isFloat({ gt: 0 }).withMessage('price must be a positive number'),
   body('mileage').optional().isInt({ min: 0 }).withMessage('mileage must be a positive integer'),
   body('condition').optional().isIn(['New', 'Used', 'Certified']).withMessage('condition must be New, Used, or Certified'),
-  body('features').optional().isArray().withMessage('features must be an array'),
+  body('features').optional().custom(val => Array.isArray(val) || typeof val === 'string'),
   body('description').optional().isString(),
   body('contactMethod').optional().isString()
 ];
 
+// Middleware to validate request body
 function validateRequest(req, res, next) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
   next();
 }
 
+// Public routes
 router.get('/', getAllCars);
+router.get('/user/:userId', getCarsByUser); // cars by user
 router.get('/:id', getCarById);
 
+// User cars (requires auth)
+router.get('/me/cars', authMiddleware, getUserCars);
+
+// Create (requires auth)
 router.post(
   '/',
   authMiddleware,
@@ -78,6 +71,7 @@ router.post(
   addCar
 );
 
+// Update
 router.put(
   '/:id',
   authMiddleware,
@@ -87,6 +81,7 @@ router.put(
   updateCar
 );
 
+// Delete
 router.delete('/:id', authMiddleware, deleteCar);
 
 module.exports = router;

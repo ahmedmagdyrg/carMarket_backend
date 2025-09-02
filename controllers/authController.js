@@ -1,71 +1,113 @@
-const User = require('../models/User');
+const User = require('../models/user');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-// Register a new user
+function calculateAge(dateOfBirth) {
+  const today = new Date();
+  const dob = new Date(dateOfBirth);
+  let age = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+    age--;
+  }
+  return age;
+}
+
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role, dateOfBirth } = req.body;
+    let image = null;
 
-    // Basic validation
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !dateOfBirth) {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
-    // Email existence check
+    if (calculateAge(dateOfBirth) < 18) {
+      return res.status(400).json({ message: 'You must be at least 18 years old to register' });
+    }
+
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: 'Email already exists' });
     }
 
-    // Hash password
+    if (req.file) {
+      image = `/uploads/avatars/${req.file.filename}`;
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
-    const user = await User.create({ name, email, password: hashedPassword });
+    const user = await User.create({ 
+      name, 
+      email, 
+      password: hashedPassword,
+      role: role || "user",
+      dateOfBirth,
+      image
+    });
 
     res.status(201).json({
       message: 'User registered successfully!',
-      user: { id: user._id, name: user.name, email: user.email }
+      user: { 
+        id: user._id, 
+        name: user.name, 
+        email: user.email, 
+        role: user.role, 
+        banned: user.banned, 
+        image: user.image,
+        dateOfBirth: user.dateOfBirth
+      }
+      
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
+  
 };
 
-// Login user and return JWT
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Basic validation
     if (!email || !password) {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
-    // Find user
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).populate("cars");
     if (!user) {
       return res.status(400).json({ message: 'Invalid email or password' });
     }
 
-    // Compare password
     const ok = await bcrypt.compare(password, user.password);
     if (!ok) {
       return res.status(400).json({ message: 'Invalid email or password' });
     }
 
-    // Create token
+    if (user.banned) {
+      return res.status(403).json({
+        message: 'Your account has been banned. Please contact the admin at ahmed.magdy362006@gmail.com'
+      });
+    }
+
     const token = jwt.sign(
-      { id: user._id, email: user.email },
+      { id: user._id, email: user.email, role: user.role, banned: user.banned },
       process.env.JWT_SECRET,
-      { expiresIn: '2h' }
+      { expiresIn: '3h' }
     );
 
     res.json({
       message: 'User logged in successfully!',
       token,
-      user: { id: user._id, name: user.name, email: user.email }
+      user: { 
+        id: user._id, 
+        name: user.name, 
+        email: user.email, 
+        role: user.role,
+        banned: user.banned,
+        image: user.image,
+        cars: user.cars,
+        dateOfBirth: user.dateOfBirth
+      }
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

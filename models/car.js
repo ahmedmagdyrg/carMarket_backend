@@ -7,16 +7,24 @@ const carSchema = new mongoose.Schema(
     year: { type: Number, required: true },
     price: { type: Number, required: true },
     mileage: { type: Number, required: true },
-    condition: { 
-      type: String, 
-      enum: ["New", "Used", "Certified"], 
-      required: true 
+    condition: {
+      type: String,
+      enum: ["New", "Used", "Certified"],
+      required: true,
     },
     features: { type: [String], default: [] },
     description: { type: String },
-    images: { type: [String], required: true },
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    contactMethod: { type: String, required: true }
+    images: {
+      originals: { type: [String], required: true }, 
+      resized: { type: [String], required: true },   
+    },
+
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    contactMethod: { type: String, required: true },
   },
   { timestamps: true }
 );
