@@ -23,6 +23,26 @@ router.post('/register', upload.single('avatar'), registerUser);
 // Login
 router.post('/login', loginUser);
 
+// Admin: get single user by id
+router.get('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      banned: user.banned || false,
+      image: getFullImageUrl(req, user.image),
+      dateOfBirth: user.dateOfBirth
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Get my profile
 router.get('/me', authMiddleware, async (req, res) => {
   try {
