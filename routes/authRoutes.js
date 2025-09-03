@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const { registerUser, loginUser } = require('../controllers/authController');
+const { registerUser, loginUser, forgotPassword, resetPassword } = require('../controllers/authController');
 const { authMiddleware, adminMiddleware } = require('../middleware/authMiddleware');
 const User = require('../models/user');
 const Car = require('../models/car');
@@ -17,11 +17,15 @@ const getFullImageUrl = (req, imagePath) => {
   return `${req.protocol}://${req.get('host')}${imagePath}`.replace(/([^:]\/)\/+/g, "$1");
 };
 
-// Register (with avatar + dateOfBirth validation in controller)
+// Register
 router.post('/register', upload.single('avatar'), registerUser);
 
 // Login
 router.post('/login', loginUser);
+
+// Forgot/Reset Password
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password/:token', resetPassword);
 
 // Admin: get single user by id
 router.get('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
