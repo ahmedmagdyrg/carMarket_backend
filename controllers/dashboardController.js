@@ -1,4 +1,3 @@
-// controllers/dashboardController.js
 const User = require('../models/user');
 const Car = require('../models/car');
 

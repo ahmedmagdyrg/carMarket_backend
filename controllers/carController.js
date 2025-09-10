@@ -4,6 +4,7 @@ const sharp = require("sharp");
 const fs = require("fs");
 const path = require("path");
 
+// Get all cars
 const getAllCars = async (req, res) => {
   try {
     const cars = await Car.find().sort({ createdAt: -1 });
@@ -13,6 +14,7 @@ const getAllCars = async (req, res) => {
   }
 };
 
+// Get a single car by ID
 const getCarById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -30,17 +32,16 @@ const getCarById = async (req, res) => {
   }
 };
 
+// Process uploaded images (save original + resized)
 const processImages = async (files) => {
   const originals = [];
   const resized = [];
 
   for (const file of files) {
-    // النسخة الأصلية
     const originalPath = path.join("uploads", "originals", `${Date.now()}-${file.originalname}`);
-    fs.renameSync(file.path, originalPath); // ننقلها من uploads/ إلى uploads/originals
+    fs.renameSync(file.path, originalPath);
     originals.push("/" + originalPath.replace(/\\/g, "/"));
 
-    // النسخة المعدلة (بخلفية شفافة)
     const resizedPath = path.join(
       "uploads",
       "resized",
@@ -60,6 +61,7 @@ const processImages = async (files) => {
   return { originals, resized };
 };
 
+// Add a new car
 const addCar = async (req, res) => {
   try {
     const {
@@ -74,10 +76,10 @@ const addCar = async (req, res) => {
       contactMethod,
     } = req.body;
 
+    // Validate required fields
     if (!make || !model || !year || !condition || !price || !mileage || !contactMethod) {
       return res.status(400).json({
-        message:
-          "make, model, year, condition, price, mileage, and contactMethod are required",
+        message: "make, model, year, condition, price, mileage, and contactMethod are required",
       });
     }
 
@@ -85,8 +87,10 @@ const addCar = async (req, res) => {
       return res.status(400).json({ message: "At least one image is required" });
     }
 
+    // Process images
     const { originals, resized } = await processImages(req.files);
 
+    // Create new car
     const newCar = await Car.create({
       make,
       model,
@@ -107,6 +111,7 @@ const addCar = async (req, res) => {
   }
 };
 
+// Update car
 const updateCar = async (req, res) => {
   try {
     const { id } = req.params;
@@ -117,10 +122,13 @@ const updateCar = async (req, res) => {
     const car = await Car.findById(id);
     if (!car) return res.status(404).json({ message: "Car not found" });
 
-    if (car.userId.toString() !== req.user.id && req.user.role !== "admin") {
-      return res
-        .status(403)
-        .json({ message: "You are not allowed to update this car" });
+    // Only the car owner, admin, or superAdmin can update
+    if (
+      car.userId.toString() !== req.user.id &&
+      req.user.role !== "admin" &&
+      !req.user.isSuperAdmin
+    ) {
+      return res.status(403).json({ message: "You are not allowed to update this car" });
     }
 
     const {
@@ -162,6 +170,7 @@ const updateCar = async (req, res) => {
   }
 };
 
+// Delete car
 const deleteCar = async (req, res) => {
   try {
     const { id } = req.params;
@@ -172,10 +181,13 @@ const deleteCar = async (req, res) => {
     const car = await Car.findById(id);
     if (!car) return res.status(404).json({ message: "Car not found" });
 
-    if (car.userId.toString() !== req.user.id && req.user.role !== "admin") {
-      return res
-        .status(403)
-        .json({ message: "You are not allowed to delete this car" });
+    // Only the car owner, admin, or superAdmin can delete
+    if (
+      car.userId.toString() !== req.user.id &&
+      req.user.role !== "admin" &&
+      !req.user.isSuperAdmin
+    ) {
+      return res.status(403).json({ message: "You are not allowed to delete this car" });
     }
 
     await car.deleteOne();
@@ -185,6 +197,7 @@ const deleteCar = async (req, res) => {
   }
 };
 
+// Get all cars of a specific user
 const getCarsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -198,6 +211,7 @@ const getCarsByUser = async (req, res) => {
   }
 };
 
+// Get cars of currently logged-in user
 const getUserCars = async (req, res) => {
   try {
     const userId = req.user.id;

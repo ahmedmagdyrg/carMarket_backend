@@ -24,7 +24,7 @@ const upload = multer({ storage });
 const createCarValidators = [
   body('make').notEmpty().withMessage('make is required'),
   body('model').notEmpty().withMessage('model is required'),
-  body('year').notEmpty().isInt({ min: 1886 }).withMessage('year must be valid'),
+  body('year').notEmpty().isInt({ min: 1980 }).withMessage('year must be valid'),
   body('price').notEmpty().isFloat({ gt: 0 }).withMessage('price must be a positive number'),
   body('mileage').notEmpty().isInt({ min: 0 }).withMessage('mileage must be a positive integer'),
   body('condition').notEmpty().isIn(['New', 'Used', 'Certified']).withMessage('condition must be New, Used, or Certified'),
@@ -37,7 +37,7 @@ const createCarValidators = [
 const updateCarValidators = [
   body('make').optional().isString(),
   body('model').optional().isString(),
-  body('year').optional().isInt({ min: 1886 }).withMessage('year must be valid'),
+  body('year').optional().isInt({ min: 1980 }).withMessage('year must be valid'),
   body('price').optional().isFloat({ gt: 0 }).withMessage('price must be a positive number'),
   body('mileage').optional().isInt({ min: 0 }).withMessage('mileage must be a positive integer'),
   body('condition').optional().isIn(['New', 'Used', 'Certified']).withMessage('condition must be New, Used, or Certified'),

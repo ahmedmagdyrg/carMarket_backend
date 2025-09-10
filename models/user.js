@@ -11,6 +11,11 @@ const userSchema = new mongoose.Schema({
     default: 'user'
   },
 
+  isSuperAdmin: {
+    type: Boolean,
+    default: false
+  },
+
   banned: {          
     type: Boolean,
     default: false

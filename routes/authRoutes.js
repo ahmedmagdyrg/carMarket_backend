@@ -1,8 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const { registerUser, loginUser, forgotPassword, resetPassword } = require('../controllers/authController');
-const { authMiddleware, adminMiddleware } = require('../middleware/authMiddleware');
+const {
+  registerUser,
+  loginUser,
+  forgotPassword,
+  resetPassword,
+  verifySuperAdmin
+} = require('../controllers/authController');
+const {
+  authMiddleware,
+  adminMiddleware
+} = require('../middleware/authMiddleware');
 const User = require('../models/user');
 const Car = require('../models/car');
 
@@ -17,21 +26,46 @@ const getFullImageUrl = (req, imagePath) => {
   return `${req.protocol}://${req.get('host')}${imagePath}`.replace(/([^:]\/)\/+/g, "$1");
 };
 
-// Register
+async function requireMasterPassword(req, res, next) {
+  try {
+    if (req.user.isSuperAdmin) return next();
+
+    const targetUser = await User.findById(req.params.id || req.body.userId);
+    if (!targetUser) {
+      return res.status(404).json({ message: 'Target user not found' });
+    }
+
+    const newRole = req.body.role;
+    const isChangingToAdmin = newRole === 'admin';
+
+    if (targetUser.role === 'admin' || isChangingToAdmin) {
+      const { masterPassword } = req.body;
+      if (!masterPassword) {
+        return res.status(403).json({ message: 'Master password required' });
+      }
+
+      const valid = masterPassword === process.env.MASTER_ADMIN_PASSWORD;
+      if (!valid) {
+        return res.status(403).json({ message: 'Invalid master password' });
+      }
+    }
+
+    next();
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+}
+
 router.post('/register', upload.single('avatar'), registerUser);
-
-// Login
 router.post('/login', loginUser);
-
-// Forgot/Reset Password
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password/:token', resetPassword);
+router.post('/verify-superadmin', authMiddleware, verifySuperAdmin);
 
-// Admin: get single user by id
 router.get('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select('-password');
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user || user.isSuperAdmin) return res.status(404).json({ message: 'User not found' });
 
     res.json({
       _id: user._id,
@@ -47,7 +81,6 @@ router.get('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
   }
 });
 
-// Get my profile
 router.get('/me', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
@@ -67,7 +100,6 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
-// Update my profile (name, email)
 router.patch('/me', authMiddleware, async (req, res) => {
   try {
     const { name, email } = req.body;
@@ -93,7 +125,6 @@ router.patch('/me', authMiddleware, async (req, res) => {
   }
 });
 
-// Upload/update avatar
 router.post('/me/avatar', authMiddleware, upload.single('avatar'), async (req, res) => {
   try {
     const updated = await User.findByIdAndUpdate(
@@ -116,7 +147,6 @@ router.post('/me/avatar', authMiddleware, upload.single('avatar'), async (req, r
   }
 });
 
-// Get my cars
 router.get('/me/cars', authMiddleware, async (req, res) => {
   try {
     const cars = await Car.find({ owner: req.user.id }).sort({ createdAt: -1 });
@@ -126,10 +156,9 @@ router.get('/me/cars', authMiddleware, async (req, res) => {
   }
 });
 
-// Admin: get all users
 router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const users = await User.find().select('-password');
+    const users = await User.find({ isSuperAdmin: { $ne: true } }).select('-password');
     const usersWithImage = users.map(u => ({
       ...u.toObject(),
       image: getFullImageUrl(req, u.image),
@@ -141,15 +170,19 @@ router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
   }
 });
 
-// Admin: update user role
-router.patch('/users/:id/role', authMiddleware, adminMiddleware, async (req, res) => {
+router.patch('/users/:id/role', authMiddleware, adminMiddleware, requireMasterPassword, async (req, res) => {
   try {
     const { role } = req.body;
     if (!['user', 'admin'].includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
-    const user = await User.findByIdAndUpdate(req.params.id, { role }, { new: true }).select('-password');
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    const user = await User.findById(req.params.id);
+    if (!user || user.isSuperAdmin) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.role = role;
+    await user.save();
 
     res.json({
       ...user.toObject(),
@@ -161,22 +194,26 @@ router.patch('/users/:id/role', authMiddleware, adminMiddleware, async (req, res
   }
 });
 
-// Admin: delete user
-router.delete('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
+router.delete('/users/:id', authMiddleware, adminMiddleware, requireMasterPassword, async (req, res) => {
   try {
-    const result = await User.findByIdAndDelete(req.params.id);
-    if (!result) return res.status(404).json({ message: 'User not found' });
+    const user = await User.findById(req.params.id);
+    if (!user || user.isSuperAdmin) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    await User.findByIdAndDelete(req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// Admin: ban user
-router.post('/users/:id/ban', authMiddleware, adminMiddleware, async (req, res) => {
+router.post('/users/:id/ban', authMiddleware, adminMiddleware, requireMasterPassword, async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user || user.isSuperAdmin) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
     user.banned = true;
     await user.save();
@@ -187,11 +224,12 @@ router.post('/users/:id/ban', authMiddleware, adminMiddleware, async (req, res) 
   }
 });
 
-// Admin: unban user
-router.post('/users/:id/unban', authMiddleware, adminMiddleware, async (req, res) => {
+router.post('/users/:id/unban', authMiddleware, adminMiddleware, requireMasterPassword, async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user || user.isSuperAdmin) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
     user.banned = false;
     await user.save();
@@ -202,17 +240,17 @@ router.post('/users/:id/unban', authMiddleware, adminMiddleware, async (req, res
   }
 });
 
-// Admin dashboard stats
 router.get('/admin/dashboard-stats', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const totalUsers = await User.countDocuments();
+    const totalUsers = await User.countDocuments({ isSuperAdmin: { $ne: true } });
     const totalCars = await Car.countDocuments();
 
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
     const usersLoggedInToday = await User.countDocuments({
-      updatedAt: { $gte: startOfToday }
+      updatedAt: { $gte: startOfToday },
+      isSuperAdmin: { $ne: true }
     });
 
     const latestCar = await Car.findOne().sort({ createdAt: -1 });

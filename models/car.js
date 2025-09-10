@@ -18,7 +18,7 @@ const carSchema = new mongoose.Schema(
       originals: { type: [String], required: true }, 
       resized: { type: [String], required: true },   
     },
-
+ 
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

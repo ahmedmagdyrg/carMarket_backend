@@ -11,7 +11,7 @@ const sendEmail = async (to, subject, text) => {
     });
 
     await transporter.sendMail({
-      from: `"Car Market" <${process.env.EMAIL_USER}>`,
+      from: `"CarSpot" <${process.env.EMAIL_USER}>`,
       to,
       subject,
       text
